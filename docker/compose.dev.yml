@@ -1,0 +1,47 @@
+services:
+  mysql:
+    # 使用 MySQL 8.0 官方镜像。
+    image: mysql:8.0
+
+    # 固定本地容器名称，方便查看日志和进入容器。
+    container_name: devflow-mysql
+
+    # 容器异常退出后自动重启，手动停止时保持停止状态。
+    restart: unless-stopped
+
+    # 复用后端环境变量，避免维护多套配置文件。
+    env_file:
+      - ../backend/.env
+
+    environment:
+      # 统一数据库容器时区。
+      TZ: Asia/Shanghai
+
+    ports:
+      # FastAPI 在 Mac 本机运行，通过本机 3306 端口连接 MySQL。
+      - "3306:3306"
+
+    volumes:
+      # 持久化 MySQL 数据，容器重建后数据仍然保留。
+      - devflow_mysql_data:/var/lib/mysql
+
+    command:
+      # 明确指定数据库字符集和排序规则。
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+
+    healthcheck:
+      # 在容器内部检查 MySQL 是否已经可以正常响应。
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  # 声明由 Docker 管理的 MySQL 持久化数据卷。
+  devflow_mysql_data:
