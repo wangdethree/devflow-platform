@@ -1,15 +1,39 @@
+"""DevFlow FastAPI 应用入口。
+
+负责创建应用实例、加载基础配置并注册顶层路由。
+具体业务逻辑应放在对应的 API、Service 和 Repository 层。
+"""
+
 from fastapi import FastAPI
 
+from app.api.v1.router import api_router
+from app.core.config import settings
 
+
+# 创建 FastAPI 应用实例。
 app = FastAPI(
-    title="DevFlow Platform",
-    description="Enterprise Development Collaboration Platform",
-    version="0.1.0",
+    title=settings.app_name,
+    description="DevFlow 企业研发协作平台后端 API",
+    version=settings.app_version,
+    debug=settings.debug,
+)
+
+# 注册 API v1 总路由，并统一添加版本前缀。
+app.include_router(
+    api_router,
+    prefix=settings.api_v1_prefix,
 )
 
 
-@app.get("/")
-async def root():
+@app.get(
+    "/",
+    tags=["系统"],
+    summary="服务首页",
+)
+async def root() -> dict[str, str]:
+    """返回应用名称和当前运行环境。"""
+
     return {
-        "message": "DevFlow API is running"
+        "message": f"{settings.app_name} API is running",
+        "environment": settings.environment,
     }
