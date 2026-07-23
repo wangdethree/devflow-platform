@@ -5,6 +5,9 @@
 """
 
 from app.models.permission import Permission
+from app.models.project import Project
+from app.models.project_member import ProjectMember
+from app.models.project_role import ProjectRole
 from app.models.role import Role
 from app.models.role_permission import RolePermission
 from app.models.user import User
@@ -15,6 +18,9 @@ __all__ = [
     "User",
     "Role",
     "Permission",
+    "Project",
+    "ProjectMember",
+    "ProjectRole",
     "UserRole",
     "RolePermission",
 ]

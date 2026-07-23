@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.permissions import ALL_PERMISSIONS, PROJECT_CREATE
 from app.core.security import hash_password
 from app.models.permission import Permission
+from app.models.project_role import ProjectRole
 from app.models.role import Role
 from app.models.role_permission import RolePermission
 from app.models.user import User
@@ -68,6 +69,19 @@ async def seed_reference_data(session: AsyncSession) -> None:
                         permission_id=relation[1],
                     )
                 )
+
+    for name, description in {
+        "Owner": "项目负责人",
+        "Developer": "项目开发人员",
+        "Viewer": "项目只读成员",
+    }.items():
+        project_role = (
+            await session.execute(
+                select(ProjectRole).where(ProjectRole.name == name)
+            )
+        ).scalar_one_or_none()
+        if project_role is None:
+            session.add(ProjectRole(name=name, description=description))
     await session.commit()
 
 
