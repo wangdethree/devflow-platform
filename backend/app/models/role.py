@@ -27,6 +27,7 @@ class Role(Base):
     name = Column(
         String(50),
         nullable=False,
+        unique=True,
         comment="角色名称",
     )
 

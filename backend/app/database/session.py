@@ -5,6 +5,7 @@
 """
 
 from sqlalchemy.engine import URL
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -26,18 +27,18 @@ DATABASE_URL = URL.create(
 )
 
 # 创建全局异步数据库引擎。
-engine = create_async_engine(
-    DATABASE_URL,
+engine_options: dict = {
+    "echo": settings.debug,
+    "pool_pre_ping": True,
+    "pool_recycle": 1800,
+}
 
-    # 开发调试时输出 SQL，生产环境应关闭。
-    echo=settings.debug,
+# Pytest 会为测试创建独立事件循环；禁用连接复用可避免连接跨循环使用，
+# 同时确保测试请求结束后立即归还数据库连接。
+if settings.environment == "test":
+    engine_options["poolclass"] = NullPool
 
-    # 从连接池取出连接前验证其可用性。
-    pool_pre_ping=True,
-
-    # 定期回收连接，降低 MySQL 主动断开空闲连接的影响。
-    pool_recycle=1800,
-)
+engine = create_async_engine(DATABASE_URL, **engine_options)
 
 # 创建异步会话工厂，每次调用都会生成独立的 AsyncSession。
 AsyncSessionLocal = async_sessionmaker(
