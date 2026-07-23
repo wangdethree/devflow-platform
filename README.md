@@ -334,3 +334,5 @@ backend/.venv/bin/python scripts/run_load_test.py \
 - `docs/development/04-resume-interview-guide.md`
 - `docs/development/06-frontend-learning-guide.md`
 - `docs/development/07-frontend-api-mapping.md`
+- `docs/development/08-backend-interview-playbook.md`
+- `docs/development/09-backend-interview-cheatsheet.md`

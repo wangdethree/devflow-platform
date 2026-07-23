@@ -4,7 +4,7 @@
 
 ## 1. 项目简介
 
-DevFlow 是一个基于 FastAPI 的企业研发协作后端，采用 SQLAlchemy 2.0 Async 和 MySQL 实现用户认证、系统 RBAC、项目成员权限、Issue 状态流转、评论、Review 与站内通知闭环，并使用 Redis、Celery、Prometheus、Alembic、Pytest 和 Docker 补齐缓存、异步任务、可观测性、迁移、测试与部署能力。
+DevFlow 是一个以 FastAPI 为核心的企业研发协作平台，采用 SQLAlchemy 2.0 Async 和 MySQL 实现用户认证、系统 RBAC、项目成员权限、Issue 状态流转、评论、Review 与站内通知闭环，并使用 Redis、Celery、Prometheus、Alembic、Pytest 和 Docker 补齐缓存、异步任务、可观测性、迁移、测试与部署能力。仓库同时包含 Vue 3 管理端用于真实接口联调和业务演示；投递后端岗位时，应把前端定位为后端能力的验证入口，而不是项目的主要技术卖点。
 
 ## 2. 中文简历描述
 
@@ -16,6 +16,7 @@ DevFlow 是一个基于 FastAPI 的企业研发协作后端，采用 SQLAlchemy 
 - 实现 Issue 多条件筛选、关键词查询与分页，依据实际查询场景为项目、负责人、状态和用户未读通知建立索引；
 - 使用 Redis 缓存用户权限并实现可降级登录限流，使用 Celery 在事务提交后异步发布通知事件，完成 MySQL/Redis/API/Worker/Nginx/Prometheus 的 Docker Compose 编排；
 - 建立 JSON 结构化日志和 Prometheus HTTP、SQL、认证与并发冲突指标，编写异步压测脚本并保存 20 并发本机 Docker 读场景基线。
+- 编写 31 项后端自动化测试覆盖认证、权限、事务、并发、迁移与指标场景，并通过 Vue 3 管理端完成核心 API 业务链路真实联调。
 
 不要写“高并发”“百万用户”“性能提升 80%”等仓库无法证明的表述。
 
@@ -245,7 +246,7 @@ Access Token 为短期 JWT 并绑定服务端设备会话；Refresh Token 每次
 - 未部署线上生产环境，不声称生产稳定性；
 - 未实现 WebSocket 客户端，不声称端到端实时推送；
 - 未实现审计日志、附件、浏览器安全 Cookie 或 CI/CD；
-- 没有前端；
+- 已有 Vue 3 管理端，但未实现浏览器 E2E、前端容器镜像和公网演示部署；
 - 没有微服务、Kafka、Elasticsearch 或完整 DevOps；
 - Redis 缓存没有 A/B 基准数据，不写性能提升百分比；
 - 测试覆盖核心场景，但未计算语句或分支覆盖率。
