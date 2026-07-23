@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
+    ConcurrentUpdateError,
     InvalidStateTransitionError,
     PermissionDeniedError,
     ResourceNotFoundError,
@@ -145,29 +146,41 @@ class IssueService:
         issue = await self.require_issue(issue_id, user)
         await self._require_write(issue, user)
         data = payload.model_dump(exclude_unset=True)
+        expected_version = data.pop("version")
         old_assignee_id = issue.assignee_id
         if "assignee_id" in data:
             await self._validate_assignee(issue.project_id, data["assignee_id"])
-        for field, value in data.items():
-            setattr(issue, field, value.value if hasattr(value, "value") else value)
+        values = {
+            field: value.value if hasattr(value, "value") else value
+            for field, value in data.items()
+        }
         try:
+            if not await self.issues.update_with_version(
+                issue.id,
+                expected_version,
+                values,
+            ):
+                raise ConcurrentUpdateError(
+                    "Issue 已被其他请求修改，请重新读取后再提交"
+                )
             notification = None
             if (
                 "assignee_id" in data
-                and issue.assignee_id is not None
-                and issue.assignee_id != old_assignee_id
+                and values["assignee_id"] is not None
+                and values["assignee_id"] != old_assignee_id
             ):
                 notification = await self.notifications.create(
-                    user_id=issue.assignee_id,
+                    user_id=values["assignee_id"],
                     notification_type=ISSUE_ASSIGNED,
                     target_type="issue",
                     target_id=issue.id,
-                    content=f"Issue「{issue.title}」已分配给你",
+                    content=f"Issue「{values.get('title', issue.title)}」已分配给你",
                 )
             await self.session.commit()
-            await self.session.refresh(issue)
+            issue = await self.issues.get(issue.id)
             if notification is not None:
                 enqueue_notification_delivery(notification.id)
+            assert issue is not None
             return issue
         except Exception:
             await self.session.rollback()
@@ -178,6 +191,7 @@ class IssueService:
         issue_id: int,
         user: User,
         target_status: IssueStatus,
+        expected_version: int,
     ) -> Issue:
         """按 OPEN→IN_PROGRESS→REVIEW→DONE 顺序流转状态。"""
 
@@ -188,8 +202,15 @@ class IssueService:
             raise InvalidStateTransitionError(
                 f"不允许从 {issue.status} 流转到 {target_status.value}"
             )
-        issue.status = target_status.value
         try:
+            if not await self.issues.update_with_version(
+                issue.id,
+                expected_version,
+                {"status": target_status.value},
+            ):
+                raise ConcurrentUpdateError(
+                    "Issue 已被其他请求修改，请重新读取后再提交"
+                )
             notification = None
             if issue.assignee_id is not None:
                 notification = await self.notifications.create(
@@ -197,24 +218,39 @@ class IssueService:
                     notification_type=ISSUE_STATUS_CHANGED,
                     target_type="issue",
                     target_id=issue.id,
-                    content=f"Issue「{issue.title}」状态已更新为 {issue.status}",
+                    content=(
+                        f"Issue「{issue.title}」状态已更新为 {target_status.value}"
+                    ),
                 )
             await self.session.commit()
-            await self.session.refresh(issue)
+            issue = await self.issues.get(issue.id)
             if notification is not None:
                 enqueue_notification_delivery(notification.id)
+            assert issue is not None
             return issue
         except Exception:
             await self.session.rollback()
             raise
 
-    async def delete_issue(self, issue_id: int, user: User) -> None:
+    async def delete_issue(
+        self,
+        issue_id: int,
+        user: User,
+        expected_version: int,
+    ) -> None:
         """Owner 或授权 Developer 软删除 Issue。"""
 
         issue = await self.require_issue(issue_id, user)
         await self._require_write(issue, user)
-        issue.is_deleted = True
         try:
+            if not await self.issues.update_with_version(
+                issue.id,
+                expected_version,
+                {"is_deleted": True},
+            ):
+                raise ConcurrentUpdateError(
+                    "Issue 已被其他请求修改，请重新读取后再提交"
+                )
             await self.session.commit()
         except Exception:
             await self.session.rollback()

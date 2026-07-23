@@ -1,5 +1,7 @@
 """Issue 筛选分页、权限、软删除和状态机集成测试。"""
 
+import asyncio
+
 import pytest
 from httpx import AsyncClient
 
@@ -140,7 +142,7 @@ async def test_illegal_status_transition_is_rejected(
 
     response = await client.patch(
         f"/api/v1/issues/{issue['id']}/status",
-        json={"status": "DONE"},
+        json={"status": "DONE", "version": issue["version"]},
         headers=headers,
     )
     assert response.status_code == 409
@@ -169,7 +171,7 @@ async def test_non_member_cannot_change_status(client: AsyncClient) -> None:
 
     response = await client.patch(
         f"/api/v1/issues/{issue['id']}/status",
-        json={"status": "IN_PROGRESS"},
+        json={"status": "IN_PROGRESS", "version": issue["version"]},
         headers=outsider_headers,
     )
     assert response.status_code == 403
@@ -191,13 +193,53 @@ async def test_deleted_issue_cannot_be_modified(client: AsyncClient) -> None:
     )
     deleted = await client.delete(
         f"/api/v1/issues/{issue['id']}",
+        params={"version": issue["version"]},
         headers=headers,
     )
     assert deleted.status_code == 204
 
     response = await client.patch(
         f"/api/v1/issues/{issue['id']}",
-        json={"title": "不能修改"},
+        json={"title": "不能修改", "version": issue["version"]},
         headers=headers,
     )
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_concurrent_issue_updates_reject_lost_update(
+    client: AsyncClient,
+) -> None:
+    owner, headers = await create_user(
+        client,
+        username="owner",
+        email="owner@example.com",
+    )
+    project = await create_project(client, headers)
+    issue = await create_issue(
+        client,
+        project_id=project["id"],
+        headers=headers,
+        assignee_id=owner["id"],
+    )
+
+    async def update_title(title: str):
+        return await client.patch(
+            f"/api/v1/issues/{issue['id']}",
+            json={"title": title, "version": issue["version"]},
+            headers=headers,
+        )
+
+    first, second = await asyncio.gather(
+        update_title("并发更新 A"),
+        update_title("并发更新 B"),
+    )
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    conflict = first if first.status_code == 409 else second
+    assert conflict.json()["code"] == "CONCURRENT_UPDATE"
+
+    current = await client.get(
+        f"/api/v1/issues/{issue['id']}",
+        headers=headers,
+    )
+    assert current.json()["version"] == issue["version"] + 1

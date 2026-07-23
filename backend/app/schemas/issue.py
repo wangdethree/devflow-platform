@@ -35,6 +35,7 @@ class IssueCreateRequest(BaseModel):
 
 
 class IssueUpdateRequest(BaseModel):
+    version: int = Field(ge=1, description="客户端读取到的当前版本")
     title: str | None = Field(default=None, min_length=2, max_length=200)
     description: str | None = None
     type: IssueType | None = None
@@ -44,6 +45,7 @@ class IssueUpdateRequest(BaseModel):
 
 class IssueStatusRequest(BaseModel):
     status: IssueStatus
+    version: int = Field(ge=1, description="客户端读取到的当前版本")
 
 
 class IssueResponse(BaseModel):
@@ -58,6 +60,7 @@ class IssueResponse(BaseModel):
     type: str
     priority: str
     status: str
+    version: int
     created_at: datetime
     updated_at: datetime
 

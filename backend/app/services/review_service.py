@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
+    ConcurrentUpdateError,
     ConflictError,
     InvalidStateTransitionError,
     PermissionDeniedError,
@@ -40,10 +41,11 @@ class ReviewService:
         issue_id: int,
         requester: User,
         reviewer_id: int,
+        issue_version: int,
     ) -> Review:
         """对处理中 Issue 发起审核并原子切换为 REVIEW。"""
 
-        issue = await self.issues.get(issue_id)
+        issue = await self.issues.get(issue_id, for_update=True)
         if issue is None:
             raise ResourceNotFoundError("Issue 不存在")
         requester_role = await self.projects.get_member_role(
@@ -77,6 +79,10 @@ class ReviewService:
             )
         if await self.reviews.get_pending(issue.id):
             raise ConflictError("该 Issue 已存在待处理 Review")
+        if issue.version != issue_version:
+            raise ConcurrentUpdateError(
+                "Issue 已被其他请求修改，请重新读取后再发起 Review"
+            )
 
         try:
             review = await self.reviews.create(
@@ -85,6 +91,7 @@ class ReviewService:
                 reviewer_id=reviewer_id,
             )
             issue.status = IssueStatus.REVIEW.value
+            issue.version += 1
             notification = await self.notifications.create(
                 user_id=reviewer_id,
                 notification_type=REVIEW_REQUESTED,
@@ -122,14 +129,18 @@ class ReviewService:
     ) -> Review:
         """指定审核人处理一次 Review，并原子更新 Issue 状态。"""
 
-        review = await self.reviews.get(review_id)
+        review = await self.reviews.get(review_id, for_update=True)
         if review is None:
             raise ResourceNotFoundError("Review 不存在")
         if review.reviewer_id != reviewer.id:
             raise PermissionDeniedError("只有指定审核人可以处理 Review")
         if review.status != ReviewStatus.PENDING.value:
-            raise ConflictError("该 Review 已经处理")
-        issue = await self.issues.get(review.issue_id)
+            if review.status == payload.status.value:
+                await self.session.commit()
+                return review
+            await self.session.rollback()
+            raise ConflictError("该 Review 已以不同结果处理")
+        issue = await self.issues.get(review.issue_id, for_update=True)
         if issue is None:
             raise ResourceNotFoundError("关联 Issue 不存在")
         if issue.status != IssueStatus.REVIEW.value:
@@ -142,6 +153,7 @@ class ReviewService:
             if payload.status == ReviewStatus.APPROVED
             else IssueStatus.IN_PROGRESS.value
         )
+        issue.version += 1
         try:
             notification = await self.notifications.create(
                 user_id=review.requester_id,

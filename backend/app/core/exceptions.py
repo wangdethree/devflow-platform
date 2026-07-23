@@ -60,6 +60,13 @@ class InvalidStateTransitionError(BusinessError):
     code = "INVALID_STATE_TRANSITION"
 
 
+class ConcurrentUpdateError(BusinessError):
+    """客户端基于旧版本修改资源，拒绝覆盖其他请求的更新。"""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "CONCURRENT_UPDATE"
+
+
 class RateLimitError(BusinessError):
     """接口访问超过允许频率。"""
 

@@ -14,6 +14,7 @@ class ReviewStatus(StrEnum):
 
 class ReviewCreateRequest(BaseModel):
     reviewer_id: int = Field(gt=0)
+    issue_version: int = Field(ge=1, description="发起 Review 时的 Issue 版本")
 
 
 class ReviewDecisionRequest(BaseModel):

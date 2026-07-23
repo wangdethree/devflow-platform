@@ -29,12 +29,16 @@ class ReviewRepository:
         await self.session.flush()
         return review
 
-    async def get(self, review_id: int) -> Review | None:
-        return (
-            await self.session.execute(
-                select(Review).where(Review.id == review_id)
-            )
-        ).scalar_one_or_none()
+    async def get(
+        self,
+        review_id: int,
+        *,
+        for_update: bool = False,
+    ) -> Review | None:
+        statement = select(Review).where(Review.id == review_id)
+        if for_update:
+            statement = statement.with_for_update()
+        return (await self.session.execute(statement)).scalar_one_or_none()
 
     async def get_pending(self, issue_id: int) -> Review | None:
         return (

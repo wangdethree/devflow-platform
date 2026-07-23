@@ -1,8 +1,13 @@
 """评论作者权限与 Review 状态联动集成测试。"""
 
+import asyncio
+
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import func, select
 
+from app.database.session import AsyncSessionLocal
+from app.models.notification import Notification
 from app.tests.test_issues import add_member, create_issue
 from app.tests.test_projects import create_project, create_user
 
@@ -83,13 +88,16 @@ async def prepare_review(
     )
     transition = await client.patch(
         f"/api/v1/issues/{issue['id']}/status",
-        json={"status": "IN_PROGRESS"},
+        json={"status": "IN_PROGRESS", "version": issue["version"]},
         headers=developer_headers,
     )
     assert transition.status_code == 200
     review = await client.post(
         f"/api/v1/issues/{issue['id']}/reviews",
-        json={"reviewer_id": reviewer["id"]},
+        json={
+            "reviewer_id": reviewer["id"],
+            "issue_version": transition.json()["version"],
+        },
         headers=developer_headers,
     )
     assert review.status_code == 201
@@ -142,3 +150,32 @@ async def test_review_rejection_returns_issue_to_in_progress(
         headers=requester_headers,
     )
     assert issue_response.json()["status"] == "IN_PROGRESS"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_same_review_decision_is_idempotent(
+    client: AsyncClient,
+) -> None:
+    review, _, reviewer_headers = await prepare_review(client)
+
+    async def approve():
+        return await client.patch(
+            f"/api/v1/reviews/{review['id']}",
+            json={"status": "APPROVED", "comment": "并发审批"},
+            headers=reviewer_headers,
+        )
+
+    first, second = await asyncio.gather(approve(), approve())
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["status"] == second.json()["status"] == "APPROVED"
+
+    async with AsyncSessionLocal() as session:
+        notification_count = await session.scalar(
+            select(func.count(Notification.id)).where(
+                Notification.target_type == "review",
+                Notification.target_id == review["id"],
+                Notification.type == "REVIEW_APPROVED",
+            )
+        )
+    assert notification_count == 1

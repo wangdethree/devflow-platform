@@ -1,6 +1,6 @@
 """Issue 查询、筛选、分页与持久化仓库。"""
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.issue import Issue
@@ -38,15 +38,42 @@ class IssueRepository:
         await self.session.flush()
         return issue
 
-    async def get(self, issue_id: int) -> Issue | None:
-        return (
-            await self.session.execute(
-                select(Issue).where(
-                    Issue.id == issue_id,
-                    Issue.is_deleted.is_(False),
-                )
+    async def get(
+        self,
+        issue_id: int,
+        *,
+        for_update: bool = False,
+    ) -> Issue | None:
+        statement = select(Issue).where(
+            Issue.id == issue_id,
+            Issue.is_deleted.is_(False),
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return (await self.session.execute(statement)).scalar_one_or_none()
+
+    async def update_with_version(
+        self,
+        issue_id: int,
+        expected_version: int,
+        values: dict,
+    ) -> bool:
+        """仅当版本匹配时更新，并在数据库中原子递增版本号。"""
+
+        result = await self.session.execute(
+            update(Issue)
+            .where(
+                Issue.id == issue_id,
+                Issue.version == expected_version,
+                Issue.is_deleted.is_(False),
             )
-        ).scalar_one_or_none()
+            .values(
+                **values,
+                version=Issue.version + 1,
+                updated_at=func.now(),
+            )
+        )
+        return bool(result.rowcount)
 
     async def list_for_user(
         self,

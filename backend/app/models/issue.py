@@ -1,6 +1,6 @@
 """Issue 核心业务 ORM 模型。"""
 
-from sqlalchemy import BigInteger, Column, ForeignKey, Index, String, Text, text
+from sqlalchemy import BigInteger, Column, ForeignKey, Index, Integer, String, Text, text
 
 from app.database.base import Base
 from app.models.mixins import SoftDeleteMixin, TimestampMixin
@@ -59,4 +59,11 @@ class Issue(TimestampMixin, SoftDeleteMixin, Base):
         default="OPEN",
         server_default=text("'OPEN'"),
         comment="Issue 状态",
+    )
+    version = Column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=text("1"),
+        comment="乐观锁版本号",
     )

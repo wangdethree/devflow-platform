@@ -119,6 +119,7 @@ async def transition_issue_status(
         issue_id,
         current_user,
         payload.status,
+        payload.version,
     )
 
 
@@ -131,6 +132,7 @@ async def delete_issue(
     issue_id: int,
     current_user: CurrentUser,
     session: DatabaseSession,
+    version: int = Query(ge=1),
 ) -> Response:
-    await IssueService(session).delete_issue(issue_id, current_user)
+    await IssueService(session).delete_issue(issue_id, current_user, version)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

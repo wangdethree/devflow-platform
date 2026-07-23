@@ -32,6 +32,7 @@ async def create_review(
         issue_id,
         current_user,
         payload.reviewer_id,
+        payload.issue_version,
     )
 
 
