@@ -19,3 +19,20 @@ async def test_database_health_check(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "mysql"}
+
+
+@pytest.mark.asyncio
+async def test_local_frontend_cors_preflight(client: AsyncClient) -> None:
+    response = await client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == (
+        "http://localhost:5173"
+    )

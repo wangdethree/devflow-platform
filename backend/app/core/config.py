@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # API 版本统一前缀
     api_v1_prefix: str = "/api/v1"
 
+    # 浏览器前端允许来源，使用逗号分隔，禁止与凭证模式下的通配符混用。
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     # JWT 认证配置
     jwt_secret_key: str = "local-development-secret-change-before-deploy"
     jwt_algorithm: str = "HS256"
