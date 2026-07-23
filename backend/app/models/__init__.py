@@ -4,6 +4,7 @@
 能够从 Base.metadata 中发现完整的数据库表结构。
 """
 
+from app.models.auth_session import AuthSession
 from app.models.comment import Comment
 from app.models.issue import Issue
 from app.models.notification import Notification
@@ -20,6 +21,7 @@ from app.models.user_role import UserRole
 
 __all__ = [
     "User",
+    "AuthSession",
     "Issue",
     "Comment",
     "Review",

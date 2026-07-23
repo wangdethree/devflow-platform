@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "local-development-secret-change-before-deploy"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 14
 
     # MySQL 数据库连接配置
     mysql_host: str = "127.0.0.1"

@@ -109,6 +109,81 @@ async def test_protected_endpoint_requires_login(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_refresh_token_rotates_and_old_token_reuse_revokes_session(
+    client: AsyncClient,
+) -> None:
+    await register(client)
+    login_response = await client.post(
+        "/api/v1/auth/login",
+        data={
+            "username": REGISTER_PAYLOAD["email"],
+            "password": REGISTER_PAYLOAD["password"],
+        },
+    )
+    original = login_response.json()
+
+    rotated_response = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": original["refresh_token"]},
+    )
+    assert rotated_response.status_code == 200
+    rotated = rotated_response.json()
+    assert rotated["refresh_token"] != original["refresh_token"]
+    assert rotated["access_token"] != original["access_token"]
+
+    replay_response = await client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": original["refresh_token"]},
+    )
+    assert replay_response.status_code == 401
+
+    protected_response = await client.get(
+        "/api/v1/users/me",
+        headers={"Authorization": f"Bearer {rotated['access_token']}"},
+    )
+    assert protected_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_immediately_invalidates_access_token(
+    client: AsyncClient,
+) -> None:
+    await register(client)
+    access_token = await login(client)
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    logout_response = await client.post("/api/v1/auth/logout", headers=headers)
+    assert logout_response.status_code == 200
+    assert logout_response.json()["revoked_sessions"] == 1
+
+    protected_response = await client.get("/api/v1/users/me", headers=headers)
+    assert protected_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_all_revokes_every_device_session(
+    client: AsyncClient,
+) -> None:
+    await register(client)
+    first_token = await login(client)
+    second_token = await login(client)
+
+    response = await client.post(
+        "/api/v1/auth/logout-all",
+        headers={"Authorization": f"Bearer {first_token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["revoked_sessions"] == 2
+
+    for token in (first_token, second_token):
+        protected = await client.get(
+            "/api/v1/users/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert protected.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_normal_user_cannot_access_admin_endpoint(
     client: AsyncClient,
 ) -> None:

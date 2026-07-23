@@ -12,8 +12,22 @@ class RegisterRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """JWT 登录响应。"""
+    """Access/Refresh Token 对及其有效期。"""
 
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
-    expires_in: int = Field(description="有效期，单位为秒")
+    expires_in: int = Field(description="Access Token 有效期，单位为秒")
+    refresh_expires_in: int = Field(description="Refresh Token 有效期，单位为秒")
+
+
+class RefreshTokenRequest(BaseModel):
+    """刷新令牌请求。"""
+
+    refresh_token: str = Field(min_length=20)
+
+
+class LogoutResponse(BaseModel):
+    """注销结果。"""
+
+    revoked_sessions: int = Field(ge=0)

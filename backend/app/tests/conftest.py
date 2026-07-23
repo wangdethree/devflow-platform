@@ -16,6 +16,7 @@ os.environ["JWT_SECRET_KEY"] = "test-secret-key-only-for-automated-tests"
 
 from app.database.session import AsyncSessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.auth_session import AuthSession  # noqa: E402
 from app.models.permission import Permission  # noqa: E402
 from app.models.comment import Comment  # noqa: E402
 from app.models.issue import Issue  # noqa: E402
@@ -36,6 +37,7 @@ async def clean_auth_tables() -> None:
 
     async with AsyncSessionLocal() as session:
         for model in (
+            AuthSession,
             Notification,
             Review,
             Comment,
