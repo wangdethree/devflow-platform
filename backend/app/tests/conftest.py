@@ -17,11 +17,14 @@ os.environ["JWT_SECRET_KEY"] = "test-secret-key-only-for-automated-tests"
 from app.database.session import AsyncSessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.permission import Permission  # noqa: E402
+from app.models.comment import Comment  # noqa: E402
+from app.models.issue import Issue  # noqa: E402
 from app.models.project import Project  # noqa: E402
 from app.models.project_member import ProjectMember  # noqa: E402
 from app.models.project_role import ProjectRole  # noqa: E402
 from app.models.role import Role  # noqa: E402
 from app.models.role_permission import RolePermission  # noqa: E402
+from app.models.review import Review  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.user_role import UserRole  # noqa: E402
 from app.services.seed_service import seed_reference_data  # noqa: E402
@@ -32,6 +35,9 @@ async def clean_auth_tables() -> None:
 
     async with AsyncSessionLocal() as session:
         for model in (
+            Review,
+            Comment,
+            Issue,
             ProjectMember,
             Project,
             ProjectRole,

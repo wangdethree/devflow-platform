@@ -4,18 +4,24 @@
 能够从 Base.metadata 中发现完整的数据库表结构。
 """
 
+from app.models.comment import Comment
+from app.models.issue import Issue
 from app.models.permission import Permission
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.project_role import ProjectRole
 from app.models.role import Role
 from app.models.role_permission import RolePermission
+from app.models.review import Review
 from app.models.user import User
 from app.models.user_role import UserRole
 
 
 __all__ = [
     "User",
+    "Issue",
+    "Comment",
+    "Review",
     "Role",
     "Permission",
     "Project",
