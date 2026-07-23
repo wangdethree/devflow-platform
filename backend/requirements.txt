@@ -4,3 +4,4 @@ pydantic-settings
 python-dotenv
 SQLAlchemy>=2.0,<3.0
 asyncmy
+alembic>=1.18,<2.0
