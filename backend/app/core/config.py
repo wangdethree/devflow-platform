@@ -27,12 +27,22 @@ class Settings(BaseSettings):
     # API 版本统一前缀
     api_v1_prefix: str = "/api/v1"
 
+    # JWT 认证配置
+    jwt_secret_key: str = "local-development-secret-change-before-deploy"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
     # MySQL 数据库连接配置
     mysql_host: str = "127.0.0.1"
     mysql_port: int = 3306
     mysql_user: str = "devflow"
     mysql_password: str
     mysql_database: str = "devflow"
+
+    # Redis 与 Celery 属于可选增强能力，核心 API 不在启动时强依赖它们。
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    celery_broker_url: str = "redis://127.0.0.1:6379/1"
+    celery_result_backend: str = "redis://127.0.0.1:6379/2"
 
     model_config = SettingsConfigDict(
         # 从 backend/.env 读取本地环境配置。
