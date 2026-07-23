@@ -4,17 +4,18 @@
 
 ## 1. 项目简介
 
-DevFlow 是一个基于 FastAPI 的企业研发协作后端，采用 SQLAlchemy 2.0 Async 和 MySQL 实现用户认证、系统 RBAC、项目成员权限、Issue 状态流转、评论、Review 与站内通知闭环，并使用 Redis、Celery、Alembic、Pytest 和 Docker 补齐缓存、异步任务、迁移、测试与部署能力。
+DevFlow 是一个基于 FastAPI 的企业研发协作后端，采用 SQLAlchemy 2.0 Async 和 MySQL 实现用户认证、系统 RBAC、项目成员权限、Issue 状态流转、评论、Review 与站内通知闭环，并使用 Redis、Celery、Prometheus、Alembic、Pytest 和 Docker 补齐缓存、异步任务、可观测性、迁移、测试与部署能力。
 
 ## 2. 中文简历描述
 
 可以从以下内容选 3～5 条，并确保自己能解释对应代码：
 
-- 基于 FastAPI、Pydantic v2 和 SQLAlchemy 2.0 Async 搭建 API/Service/Repository 分层后端，使用请求级 AsyncSession 和 Alembic 管理 12 张核心业务表；
-- 使用 JWT、Argon2 与 Admin/User RBAC 实现认证和平台权限，并设计 Owner/Developer/Viewer 项目级权限，隔离不同项目的数据与操作范围；
-- 设计 Issue 相邻状态机及 Review 审核流程，通过 Service 层事务保证 Review 状态、Issue 状态与数据库通知一致更新；
+- 基于 FastAPI、Pydantic v2 和 SQLAlchemy 2.0 Async 搭建 API/Service/Repository 分层后端，使用请求级 AsyncSession 和 Alembic 管理 13 张核心业务表；
+- 使用 JWT Access/Refresh Token、Argon2 与持久化设备会话实现令牌轮换、重放检测和主动撤销，并设计系统级与项目级双层 RBAC；
+- 设计 Issue 版本号乐观锁及 Review 行锁幂等审批，通过真实 MySQL 并发测试验证丢失更新保护和单次通知；
 - 实现 Issue 多条件筛选、关键词查询与分页，依据实际查询场景为项目、负责人、状态和用户未读通知建立索引；
-- 使用 Redis 缓存用户权限并实现可降级登录限流，使用 Celery 在事务提交后异步发布通知事件，完成 MySQL/Redis/API/Worker/Nginx 的 Docker Compose 编排。
+- 使用 Redis 缓存用户权限并实现可降级登录限流，使用 Celery 在事务提交后异步发布通知事件，完成 MySQL/Redis/API/Worker/Nginx/Prometheus 的 Docker Compose 编排；
+- 建立 JSON 结构化日志和 Prometheus HTTP、SQL、认证与并发冲突指标，编写异步压测脚本并保存 20 并发本机 Docker 读场景基线。
 
 不要写“高并发”“百万用户”“性能提升 80%”等仓库无法证明的表述。
 
@@ -25,9 +26,11 @@ DevFlow 是一个基于 FastAPI 的企业研发协作后端，采用 SQLAlchemy 
 | 经典分层 | `app/api/v1/`、`app/services/`、`app/repositories/` |
 | AsyncSession 生命周期 | `app/database/session.py`、`dependencies.py` |
 | JWT/Argon2 | `app/core/security.py`、`services/auth_service.py` |
+| 会话轮换与撤销 | `models/auth_session.py`、`auth_session_repository.py` |
 | 双层权限 | `api/dependencies.py`、`services/rbac_service.py`、`project_service.py` |
 | 项目原子创建 | `ProjectService.create_project()` |
 | Issue 状态机 | `services/issue_service.py` 的 `ALLOWED_TRANSITIONS` |
+| Issue 乐观锁 | `IssueRepository.update_with_version()` |
 | Review 状态联动 | `ReviewService.create_review()`、`decide_review()` |
 | 通知一致性 | Project/Issue/Review Service 与 `notification_repository.py` |
 | Redis 降级 | `core/cache.py`、`core/rate_limit.py` |
@@ -35,6 +38,7 @@ DevFlow 是一个基于 FastAPI 的企业研发协作后端，采用 SQLAlchemy 
 | 迁移 | `backend/alembic/versions/` |
 | 集成测试 | `backend/app/tests/` |
 | 部署 | `backend/Dockerfile`、`docker/compose.yml`、`nginx.conf` |
+| 指标与压测 | `core/metrics.py`、`scripts/run_load_test.py`、`docs/performance/` |
 
 ## 4. 项目难点
 
@@ -47,6 +51,10 @@ DevFlow 是一个基于 FastAPI 的企业研发协作后端，采用 SQLAlchemy 
 ### 多对象事务
 
 创建项目至少写 Project 和 Owner 成员关系；Review 处理至少写 Review、Issue 和 Notification。任一写入失败都应回滚，不能出现半完成业务状态。
+
+### 并发一致性
+
+Issue 修改使用 `WHERE id=? AND version=?` 条件更新并原子执行 `version=version+1`。两个客户端基于同一版本修改时只有一个成功，另一个返回 `CONCURRENT_UPDATE`。Review 决策对审核记录执行 `SELECT ... FOR UPDATE`，相同决策重试幂等返回，不重复生成通知；不同决策返回冲突。
 
 ### 异步基础设施降级
 
@@ -122,7 +130,9 @@ await session.execute(select(Model).where(...))
 2. 角色名称唯一约束；
 3. 项目与成员；
 4. Issue/评论/Review；
-5. 通知。
+5. 通知；
+6. 认证设备会话；
+7. Issue 乐观锁版本。
 
 应用启动不会自动 `create_all()`。完整 Docker API 启动命令先执行 `alembic upgrade head`，再执行幂等 seed。
 
@@ -145,6 +155,7 @@ Celery 不承载 CRUD。数据库通知随主事务提交后，Celery Worker 读
 - API：非 root 用户，启动时迁移和 seed；
 - Worker：非 root 用户、2 个并发进程；
 - Nginx：统一 8088 入口，Docker DNS 动态解析 API。
+- Prometheus：抓取 API `/metrics`，默认通过 9090 查看。
 
 Compose 用 health condition 控制依赖顺序，数据使用命名卷。密码和 JWT 密钥来自 `backend/.env`，不写入镜像和 Compose。
 
@@ -168,7 +179,7 @@ flush 把待写 SQL 发到当前事务并获得自增主键，但事务仍可回
 
 ### JWT 被盗怎么办？
 
-当前是短期 Access Token，降低泄露窗口，但未实现 Refresh Token、主动撤销列表和设备会话管理。这是当前版本边界，生产化应增加轮换、撤销和安全 Cookie 策略。
+Access Token 为短期 JWT 并绑定服务端设备会话；Refresh Token 每次刷新都会轮换，数据库只保存 SHA-256 摘要。旧 Refresh Token 重放会撤销该会话，单设备或全部设备注销后 Access Token 也会因会话检查立即失效。浏览器生产环境还应使用 Secure、HttpOnly、SameSite Cookie，并进一步处理 CSRF 和密钥轮换。
 
 ### 如何避免 N+1？
 
@@ -184,7 +195,15 @@ flush 把待写 SQL 发到当前事务并获得自增主键，但事务仍可回
 
 ### 如何防止 Review 重复处理？
 
-处理前确认当前用户是指定 Reviewer，且 Review 仍为 PENDING、Issue 为 REVIEW。第一次提交后状态改变，第二次返回 409。
+处理时对 Review 行加排他锁并确认指定 Reviewer。第一次请求原子更新 Review、Issue 和 Notification；并发的相同决策在获得锁后读取已提交结果并幂等返回 200，不重复通知，不同决策返回 409。
+
+### 乐观锁和悲观锁为什么同时使用？
+
+普通 Issue 编辑冲突频率低，乐观锁无需长时间持锁，客户端还可明确感知旧版本。Review 决策是短事务且必须串行判断“是否已处理”，行锁更直接。两者按业务冲突模型选择，不是相互替代。
+
+### Prometheus 为什么不能把 issue_id 作为标签？
+
+实际资源 ID 数量无上限，会产生高基数时间序列，显著增加 Prometheus 内存和查询成本。HTTP 指标使用 `/issues/{issue_id}` 这类路由模板作为标签。
 
 ### 为什么测试使用真实 MySQL？
 
@@ -212,6 +231,9 @@ flush 把待写 SQL 发到当前事务并获得自增主键，但事务仍可回
 - Issue 状态机合法和非法路径；
 - Alembic upgrade/downgrade 与 MySQL 外键索引；
 - Redis 故障降级和 Celery 的提交后入队策略；
+- Refresh Token 轮换、重放检测和 Access Token 会话绑定；
+- 乐观锁条件更新与 Review 行锁幂等语义；
+- JSON 日志字段、Prometheus 低基数标签和压测限制；
 - 测试库隔离与夹具清理顺序；
 - Docker 健康检查和服务依赖。
 
@@ -219,13 +241,13 @@ flush 把待写 SQL 发到当前事务并获得自增主键，但事务仍可回
 
 ## 13. 不应夸大的内容
 
-- 未做真实流量压测，不声称具体 QPS；
+- 已做本机 Docker 20 并发、15 秒短时读基线；只能引用报告中的环境和结果，不能外推生产 QPS；
 - 未部署线上生产环境，不声称生产稳定性；
 - 未实现 WebSocket 客户端，不声称端到端实时推送；
-- 未实现 Refresh Token、审计日志、附件或 CI/CD；
+- 未实现审计日志、附件、浏览器安全 Cookie 或 CI/CD；
 - 没有前端；
 - 没有微服务、Kafka、Elasticsearch 或完整 DevOps；
-- Redis 缓存没有基准数据，不写性能提升百分比；
+- Redis 缓存没有 A/B 基准数据，不写性能提升百分比；
 - 测试覆盖核心场景，但未计算语句或分支覆盖率。
 
 ## 14. 面试演示建议

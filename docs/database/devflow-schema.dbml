@@ -110,6 +110,7 @@ Table issues {
   type varchar(30) [note: 'BUG | FEATURE | TASK']
   priority varchar(30) [note: 'LOW | MEDIUM | HIGH | CRITICAL']
   status varchar(30) [note: 'OPEN | IN_PROGRESS | REVIEW | DONE']
+  version int [not null, default: 1, note: '乐观锁版本号']
   is_deleted boolean [default: false]
   created_at datetime
   updated_at datetime
@@ -121,6 +122,26 @@ Table issues {
   }
 
   Note: 'Issue 核心业务表'
+}
+
+Table auth_sessions {
+  id varchar(36) [pk, note: '会话 UUID']
+  user_id bigint
+  refresh_token_hash varchar(64) [not null, unique]
+  rotation_count int [not null, default: 0]
+  ip_address varchar(45)
+  user_agent varchar(255)
+  expires_at datetime [not null]
+  last_used_at datetime
+  revoked_at datetime
+  created_at datetime
+
+  indexes {
+    user_id [name: 'idx_auth_sessions_user_id']
+    expires_at [name: 'idx_auth_sessions_expires_at']
+  }
+
+  Note: '认证设备会话与 Refresh Token 轮换状态'
 }
 
 Table comments {
@@ -159,6 +180,7 @@ Table notifications {
 }
 
 Ref: user_roles.user_id > users.id
+Ref: auth_sessions.user_id > users.id
 Ref: user_roles.role_id > roles.id
 
 Ref: role_permissions.role_id > roles.id

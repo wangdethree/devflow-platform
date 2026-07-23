@@ -16,7 +16,7 @@
 
 ## 4. 评论回复
 
-项目介绍提到“评论回复”，但 12 表正式数据库模型的 `comments` 表没有 `parent_id`。当前版本实现平级 Issue 评论及本人修改、删除，不虚构树形回复关系；后续如需回复能力，应先通过独立迁移增加父评论字段。
+项目介绍提到“评论回复”，但初始 12 表正式数据库模型的 `comments` 表没有 `parent_id`。当前版本实现平级 Issue 评论及本人修改、删除，不虚构树形回复关系；后续如需回复能力，应先通过独立迁移增加父评论字段。
 
 ## 5. Review 版本边界
 
@@ -28,8 +28,20 @@
 
 ## 7. Issue 状态与 Review
 
-通用状态接口仅允许相邻状态流转：`OPEN → IN_PROGRESS → REVIEW → DONE`。发起 Review 会原子地把 Issue 从 `IN_PROGRESS` 更新为 `REVIEW`；通过更新为 `DONE`，拒绝回到 `IN_PROGRESS`。重复处理已完成 Review 会返回冲突错误。
+通用状态接口仅允许相邻状态流转：`OPEN → IN_PROGRESS → REVIEW → DONE`。发起 Review 会原子地把 Issue 从 `IN_PROGRESS` 更新为 `REVIEW`；通过更新为 `DONE`，拒绝回到 `IN_PROGRESS`。重复提交相同审核结果幂等返回，不同结果返回冲突。
 
-## 8. 测试数据库
+## 8. 认证会话
+
+为支持 Refresh Token 轮换、重放检测与主动注销，新增第 13 张业务表 `auth_sessions`。Access Token 绑定会话 ID，受保护请求同时检查 JWT 和服务端会话；数据库只保存 Refresh Token SHA-256 摘要，不保存可直接使用的原始令牌。
+
+## 9. 并发一致性
+
+Issue 增加单调递增 `version`，普通修改通过条件更新实现乐观锁。Review 决策使用行锁串行判断处理状态：相同决策重试幂等成功，不重复写通知；不同决策返回冲突。发起和处理 Review 都会递增 Issue 版本。
+
+## 10. 可观测性与压测
+
+HTTP 指标使用路由模板而非资源 ID，控制 Prometheus 标签基数；SQL 指标只按 SELECT/INSERT/UPDATE/DELETE 等操作分类。压测结果记录环境和原始 JSON，只作为本机版本基线，不外推生产容量。
+
+## 11. 测试数据库
 
 自动化测试使用独立数据库 `devflow_migration_test`，每个测试按外键顺序清理数据并重新执行幂等基础数据初始化。测试不依赖开发数据库中的已有数据。

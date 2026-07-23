@@ -116,10 +116,22 @@ curl -X POST http://127.0.0.1:8000/api/v1/auth/login \
 ```json
 {
   "access_token": "<JWT>",
+  "refresh_token": "<JWT>",
   "token_type": "bearer",
-  "expires_in": 1800
+  "expires_in": 1800,
+  "refresh_expires_in": 1209600
 }
 ```
+
+轮换 Refresh Token：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"refresh_token":"<粘贴 refresh_token>"}'
+```
+
+每个 Refresh Token 只能成功使用一次；旧令牌重放会撤销该设备会话。认证后调用 `/api/v1/auth/logout` 撤销当前设备，调用 `/api/v1/auth/logout-all` 撤销全部设备。
 
 ## 7. JWT 使用
 
@@ -211,6 +223,7 @@ curl -X POST \
 
 ```bash
 ISSUE_ID=1
+ISSUE_VERSION=1
 curl \
   "http://127.0.0.1:8000/api/v1/issues?project_id=$PROJECT_ID&type=FEATURE&priority=HIGH&keyword=JWT&page=1&page_size=20" \
   -H "Authorization: Bearer $TOKEN"
@@ -223,10 +236,10 @@ curl -X PATCH \
   "http://127.0.0.1:8000/api/v1/issues/$ISSUE_ID/status" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"status":"IN_PROGRESS"}'
+  -d "{\"status\":\"IN_PROGRESS\",\"version\":$ISSUE_VERSION}"
 ```
 
-从 OPEN 直接改为 DONE 会返回 `INVALID_STATE_TRANSITION`。
+成功后用响应中的新 `version` 更新 `ISSUE_VERSION`。从 OPEN 直接改为 DONE 会返回 `INVALID_STATE_TRANSITION`；旧版本并发写入会返回 `CONCURRENT_UPDATE`。
 
 ## 11. 评论
 
@@ -250,7 +263,7 @@ curl -X POST \
   "http://127.0.0.1:8000/api/v1/issues/$ISSUE_ID/reviews" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d "{\"reviewer_id\":$REVIEWER_ID}"
+  -d "{\"reviewer_id\":$REVIEWER_ID,\"issue_version\":$ISSUE_VERSION}"
 ```
 
 此时 Issue 自动进入 `REVIEW`。审核人使用自己的 Token：
@@ -265,7 +278,7 @@ curl -X PATCH \
   -d '{"status":"APPROVED","comment":"实现符合要求"}'
 ```
 
-通过后 Issue 为 `DONE`；使用 `REJECTED` 时回到 `IN_PROGRESS`。已处理 Review 再次提交返回 409。
+通过后 Issue 为 `DONE`；使用 `REJECTED` 时回到 `IN_PROGRESS`。相同结果的重复审批幂等返回 200 且不重复通知，不同结果返回 409。
 
 ## 13. 通知
 
