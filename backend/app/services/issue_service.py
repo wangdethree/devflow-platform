@@ -9,6 +9,7 @@ from app.core.exceptions import (
     ResourceNotFoundError,
 )
 from app.core.notification_types import ISSUE_ASSIGNED, ISSUE_STATUS_CHANGED
+from app.core.metrics import ISSUE_CONFLICTS_TOTAL
 from app.models.issue import Issue
 from app.models.user import User
 from app.repositories.issue_repository import IssueRepository
@@ -160,6 +161,7 @@ class IssueService:
                 expected_version,
                 values,
             ):
+                ISSUE_CONFLICTS_TOTAL.labels("update").inc()
                 raise ConcurrentUpdateError(
                     "Issue 已被其他请求修改，请重新读取后再提交"
                 )
@@ -208,6 +210,7 @@ class IssueService:
                 expected_version,
                 {"status": target_status.value},
             ):
+                ISSUE_CONFLICTS_TOTAL.labels("transition").inc()
                 raise ConcurrentUpdateError(
                     "Issue 已被其他请求修改，请重新读取后再提交"
                 )
@@ -248,6 +251,7 @@ class IssueService:
                 expected_version,
                 {"is_deleted": True},
             ):
+                ISSUE_CONFLICTS_TOTAL.labels("delete").inc()
                 raise ConcurrentUpdateError(
                     "Issue 已被其他请求修改，请重新读取后再提交"
                 )

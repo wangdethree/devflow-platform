@@ -12,6 +12,7 @@ email-validator>=2.2,<3.0
 python-multipart>=0.0.20,<1.0
 redis>=5.2,<7.0
 celery[redis]>=5.4,<6.0
+prometheus-client>=0.21,<1.0
 
 # 测试依赖与运行依赖统一维护，便于新环境一次安装后执行完整验收。
 pytest>=8.3,<10.0

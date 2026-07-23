@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, ConflictError
+from app.core.metrics import AUTH_SESSION_EVENTS_TOTAL
 from app.core.security import (
     TokenClaims,
     create_access_token,
@@ -103,6 +104,7 @@ class AuthService:
         except Exception:
             await self.session.rollback()
             raise
+        AUTH_SESSION_EVENTS_TOTAL.labels("login").inc()
         return self._token_response(user.id, session_id, refresh_token)
 
     async def refresh(self, raw_refresh_token: str) -> TokenResponse:
@@ -126,6 +128,7 @@ class AuthService:
         if auth_session.refresh_token_hash != hash_token(raw_refresh_token):
             auth_session.revoked_at = now
             await self.session.commit()
+            AUTH_SESSION_EVENTS_TOTAL.labels("replay_detected").inc()
             raise AuthenticationError("检测到 Refresh Token 重放，会话已撤销")
 
         user = await self.users.get_by_id(claims.user_id)
@@ -146,6 +149,7 @@ class AuthService:
         except Exception:
             await self.session.rollback()
             raise
+        AUTH_SESSION_EVENTS_TOTAL.labels("refresh").inc()
         return self._token_response(user.id, auth_session.id, new_refresh_token)
 
     async def revoke_session(self, claims: TokenClaims) -> int:
@@ -157,6 +161,7 @@ class AuthService:
             datetime.now(UTC).replace(tzinfo=None),
         )
         await self.session.commit()
+        AUTH_SESSION_EVENTS_TOTAL.labels("logout").inc()
         return int(revoked)
 
     async def revoke_all_sessions(self, user_id: int) -> int:
@@ -167,4 +172,5 @@ class AuthService:
             datetime.now(UTC).replace(tzinfo=None),
         )
         await self.session.commit()
+        AUTH_SESSION_EVENTS_TOTAL.labels("logout_all").inc(count)
         return count

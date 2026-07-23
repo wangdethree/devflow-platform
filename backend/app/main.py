@@ -7,6 +7,8 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.responses import Response
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -14,9 +16,11 @@ from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, register_request_logging
 from app.core.cache import close_redis
 from app.database.session import engine
+from app.core.metrics import register_database_metrics
 
 
 configure_logging()
+register_database_metrics(engine)
 
 
 @asynccontextmanager
@@ -45,6 +49,13 @@ app.include_router(
     api_router,
     prefix=settings.api_v1_prefix,
 )
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics() -> Response:
+    """暴露 Prometheus 文本格式指标。"""
+
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get(

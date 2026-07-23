@@ -1,0 +1,28 @@
+{
+  "measured_at": "2026-07-23T08:36:42.738260+00:00",
+  "base_url": "http://127.0.0.1:8088",
+  "scenario": "database_health",
+  "configuration": {
+    "concurrency": 20,
+    "requested_duration_seconds": 15.0,
+    "timeout_seconds": 5
+  },
+  "result": {
+    "elapsed_seconds": 15.089,
+    "requests": 2102,
+    "succeeded": 2102,
+    "failed": 0,
+    "requests_per_second": 139.31,
+    "status_codes": {
+      "200": 2102
+    },
+    "latency_ms": {
+      "min": 22.05,
+      "mean": 143.07,
+      "p50": 71.29,
+      "p95": 492.99,
+      "p99": 1355.83,
+      "max": 1710.74
+    }
+  }
+}

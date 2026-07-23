@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: Literal["local", "test", "production"] = "local"
     debug: bool = False
+    log_level: str = "INFO"
+    log_format: Literal["json", "plain"] = "json"
 
     # API 版本统一前缀
     api_v1_prefix: str = "/api/v1"

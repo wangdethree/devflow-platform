@@ -14,6 +14,7 @@ from app.core.notification_types import (
     REVIEW_REJECTED,
     REVIEW_REQUESTED,
 )
+from app.core.metrics import REVIEW_DECISIONS_TOTAL
 from app.models.review import Review
 from app.models.user import User
 from app.repositories.issue_repository import IssueRepository
@@ -80,6 +81,7 @@ class ReviewService:
         if await self.reviews.get_pending(issue.id):
             raise ConflictError("该 Issue 已存在待处理 Review")
         if issue.version != issue_version:
+            REVIEW_DECISIONS_TOTAL.labels("create_conflict").inc()
             raise ConcurrentUpdateError(
                 "Issue 已被其他请求修改，请重新读取后再发起 Review"
             )
@@ -137,8 +139,10 @@ class ReviewService:
         if review.status != ReviewStatus.PENDING.value:
             if review.status == payload.status.value:
                 await self.session.commit()
+                REVIEW_DECISIONS_TOTAL.labels("idempotent").inc()
                 return review
             await self.session.rollback()
+            REVIEW_DECISIONS_TOTAL.labels("decision_conflict").inc()
             raise ConflictError("该 Review 已以不同结果处理")
         issue = await self.issues.get(review.issue_id, for_update=True)
         if issue is None:
@@ -172,6 +176,7 @@ class ReviewService:
             await self.session.commit()
             await self.session.refresh(review)
             enqueue_notification_delivery(notification.id)
+            REVIEW_DECISIONS_TOTAL.labels(payload.status.value.lower()).inc()
             return review
         except Exception:
             await self.session.rollback()
