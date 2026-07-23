@@ -19,6 +19,7 @@ from app.main import app  # noqa: E402
 from app.models.permission import Permission  # noqa: E402
 from app.models.comment import Comment  # noqa: E402
 from app.models.issue import Issue  # noqa: E402
+from app.models.notification import Notification  # noqa: E402
 from app.models.project import Project  # noqa: E402
 from app.models.project_member import ProjectMember  # noqa: E402
 from app.models.project_role import ProjectRole  # noqa: E402
@@ -35,6 +36,7 @@ async def clean_auth_tables() -> None:
 
     async with AsyncSessionLocal() as session:
         for model in (
+            Notification,
             Review,
             Comment,
             Issue,

@@ -7,10 +7,12 @@ from app.core.exceptions import (
     PermissionDeniedError,
     ResourceNotFoundError,
 )
+from app.core.notification_types import PROJECT_MEMBER_ADDED
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.user import User
 from app.repositories.project_repository import ProjectRepository
+from app.repositories.notification_repository import NotificationRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.project import (
     ProjectCreateRequest,
@@ -29,6 +31,7 @@ class ProjectService:
         self.session = session
         self.projects = ProjectRepository(session)
         self.users = UserRepository(session)
+        self.notifications = NotificationRepository(session)
 
     async def require_project(
         self,
@@ -166,6 +169,14 @@ class ProjectService:
                 project_id=project_id,
                 user_id=user.id,
                 role_id=role.id,
+            )
+            # 成员关系与邀请通知共同提交，避免成员已加入但通知丢失。
+            await self.notifications.create(
+                user_id=user.id,
+                notification_type=PROJECT_MEMBER_ADDED,
+                target_type="project",
+                target_id=project_id,
+                content=f"你已加入项目，项目角色为 {role.name}",
             )
             await self.session.commit()
             await self.session.refresh(member)

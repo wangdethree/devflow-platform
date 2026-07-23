@@ -6,6 +6,7 @@
 
 from app.models.comment import Comment
 from app.models.issue import Issue
+from app.models.notification import Notification
 from app.models.permission import Permission
 from app.models.project import Project
 from app.models.project_member import ProjectMember
@@ -22,6 +23,7 @@ __all__ = [
     "Issue",
     "Comment",
     "Review",
+    "Notification",
     "Role",
     "Permission",
     "Project",

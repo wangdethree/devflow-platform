@@ -11,6 +11,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.comments import router as comments_router
 from app.api.v1.health import router as health_router
 from app.api.v1.issues import router as issues_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.projects import router as projects_router
 from app.api.v1.reviews import router as reviews_router
 from app.api.v1.users import router as users_router
@@ -28,3 +29,4 @@ api_router.include_router(projects_router)
 api_router.include_router(issues_router)
 api_router.include_router(comments_router)
 api_router.include_router(reviews_router)
+api_router.include_router(notifications_router)

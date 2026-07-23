@@ -7,9 +7,11 @@ from app.core.exceptions import (
     PermissionDeniedError,
     ResourceNotFoundError,
 )
+from app.core.notification_types import ISSUE_ASSIGNED, ISSUE_STATUS_CHANGED
 from app.models.issue import Issue
 from app.models.user import User
 from app.repositories.issue_repository import IssueRepository
+from app.repositories.notification_repository import NotificationRepository
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.issue import (
     IssueCreateRequest,
@@ -34,6 +36,7 @@ class IssueService:
         self.session = session
         self.issues = IssueRepository(session)
         self.projects = ProjectRepository(session)
+        self.notifications = NotificationRepository(session)
 
     async def require_issue(self, issue_id: int, user: User) -> Issue:
         """校验 Issue 存在且当前用户属于对应项目。"""
@@ -98,6 +101,14 @@ class IssueService:
                 issue_type=payload.type.value,
                 priority=payload.priority.value,
             )
+            if issue.assignee_id is not None:
+                await self.notifications.create(
+                    user_id=issue.assignee_id,
+                    notification_type=ISSUE_ASSIGNED,
+                    target_type="issue",
+                    target_id=issue.id,
+                    content=f"Issue「{issue.title}」已分配给你",
+                )
             await self.session.commit()
             await self.session.refresh(issue)
             return issue
@@ -130,11 +141,24 @@ class IssueService:
         issue = await self.require_issue(issue_id, user)
         await self._require_write(issue, user)
         data = payload.model_dump(exclude_unset=True)
+        old_assignee_id = issue.assignee_id
         if "assignee_id" in data:
             await self._validate_assignee(issue.project_id, data["assignee_id"])
         for field, value in data.items():
             setattr(issue, field, value.value if hasattr(value, "value") else value)
         try:
+            if (
+                "assignee_id" in data
+                and issue.assignee_id is not None
+                and issue.assignee_id != old_assignee_id
+            ):
+                await self.notifications.create(
+                    user_id=issue.assignee_id,
+                    notification_type=ISSUE_ASSIGNED,
+                    target_type="issue",
+                    target_id=issue.id,
+                    content=f"Issue「{issue.title}」已分配给你",
+                )
             await self.session.commit()
             await self.session.refresh(issue)
             return issue
@@ -159,6 +183,14 @@ class IssueService:
             )
         issue.status = target_status.value
         try:
+            if issue.assignee_id is not None:
+                await self.notifications.create(
+                    user_id=issue.assignee_id,
+                    notification_type=ISSUE_STATUS_CHANGED,
+                    target_type="issue",
+                    target_id=issue.id,
+                    content=f"Issue「{issue.title}」状态已更新为 {issue.status}",
+                )
             await self.session.commit()
             await self.session.refresh(issue)
             return issue

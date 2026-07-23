@@ -8,9 +8,15 @@ from app.core.exceptions import (
     PermissionDeniedError,
     ResourceNotFoundError,
 )
+from app.core.notification_types import (
+    REVIEW_APPROVED,
+    REVIEW_REJECTED,
+    REVIEW_REQUESTED,
+)
 from app.models.review import Review
 from app.models.user import User
 from app.repositories.issue_repository import IssueRepository
+from app.repositories.notification_repository import NotificationRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.review_repository import ReviewRepository
 from app.schemas.issue import IssueStatus
@@ -26,6 +32,7 @@ class ReviewService:
         self.reviews = ReviewRepository(session)
         self.issues = IssueRepository(session)
         self.projects = ProjectRepository(session)
+        self.notifications = NotificationRepository(session)
 
     async def create_review(
         self,
@@ -77,6 +84,13 @@ class ReviewService:
                 reviewer_id=reviewer_id,
             )
             issue.status = IssueStatus.REVIEW.value
+            await self.notifications.create(
+                user_id=reviewer_id,
+                notification_type=REVIEW_REQUESTED,
+                target_type="review",
+                target_id=review.id,
+                content=f"你收到了 Issue「{issue.title}」的 Review 请求",
+            )
             await self.session.commit()
             await self.session.refresh(review)
             return review
@@ -127,6 +141,20 @@ class ReviewService:
             else IssueStatus.IN_PROGRESS.value
         )
         try:
+            await self.notifications.create(
+                user_id=review.requester_id,
+                notification_type=(
+                    REVIEW_APPROVED
+                    if payload.status == ReviewStatus.APPROVED
+                    else REVIEW_REJECTED
+                ),
+                target_type="review",
+                target_id=review.id,
+                content=(
+                    f"Issue「{issue.title}」的 Review 已"
+                    f"{'通过' if payload.status == ReviewStatus.APPROVED else '拒绝'}"
+                ),
+            )
             await self.session.commit()
             await self.session.refresh(review)
             return review
