@@ -1,8 +1,6 @@
 # DevFlow 企业研发协作平台
 
-DevFlow 是一个面向研发团队协作场景的模块化单体 FastAPI 后端。系统以项目和 Issue 为核心，覆盖用户认证、双层权限、成员管理、任务流转、评论、Review 和站内通知，并提供 MySQL 迁移、Redis 缓存、Celery 异步分发、自动化测试和 Docker 部署。
-
-当前仓库只包含后端，不包含 Vue、React、移动端或 Git 仓库托管能力。
+DevFlow 是一个面向研发团队协作场景的前后端分离平台。系统以项目和 Issue 为核心，覆盖用户认证、双层权限、成员管理、任务流转、评论、Review 和站内通知，并提供 Vue 3 管理界面、MySQL 迁移、Redis 缓存、Celery 异步分发、自动化测试和 Docker 后端部署。
 
 ## 核心业务
 
@@ -44,6 +42,7 @@ DevFlow 是一个面向研发团队协作场景的模块化单体 FastAPI 后端
 | Observability | JSON Logs、Prometheus |
 | Test | Pytest、pytest-asyncio、HTTPX、真实隔离 MySQL 测试库 |
 | Deploy | Docker、Docker Compose、Nginx |
+| Frontend | Vue 3、Vite、TypeScript、Vue Router、Pinia、Element Plus、Axios |
 
 ## 系统架构
 
@@ -79,6 +78,17 @@ backend/
 │   └── tests/               # 自动化测试
 ├── Dockerfile
 └── requirements.txt
+frontend/
+├── src/
+│   ├── api/                  # Axios 客户端与领域 API
+│   ├── components/           # 通用表单和展示组件
+│   ├── layouts/              # 登录与主应用布局
+│   ├── router/               # 路由及权限守卫
+│   ├── stores/               # Auth、通知未读状态
+│   ├── types/                # API TypeScript 类型
+│   └── views/                # 业务页面
+├── README.md
+└── package.json
 docker/
 ├── compose.dev.yml          # 本机开发 MySQL/Redis
 ├── compose.yml              # 完整容器栈
@@ -138,6 +148,17 @@ cd backend
 
 API 地址为 `http://127.0.0.1:8000`。
 
+6. 启动 Vue 前端：
+
+```bash
+cd ../frontend
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+前端地址为 `http://127.0.0.1:5173`。详细说明见 `frontend/README.md`。
+
 ## 完整 Docker 启动
 
 先准备 `backend/.env`，然后执行：
@@ -175,6 +196,7 @@ docker compose -p devflow-full -f docker/compose.yml down
 | `DEBUG` | SQL 和应用调试开关 |
 | `LOG_LEVEL` / `LOG_FORMAT` | 日志级别及 `json`/`plain` 格式 |
 | `API_V1_PREFIX` | 默认 `/api/v1` |
+| `CORS_ORIGINS` | 逗号分隔的可信前端来源 |
 | `JWT_SECRET_KEY` | JWT 签名密钥 |
 | `JWT_ALGORITHM` | 默认 `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token 有效期 |
@@ -241,7 +263,7 @@ cd backend
 .venv/bin/pytest -q
 ```
 
-当前共 30 项自动化测试，覆盖认证、Refresh Token 轮换与撤销、RBAC、项目事务、项目成员权限、Issue 状态机与并发冲突、筛选分页、评论作者权限、Review 状态联动与并发幂等、通知归属、Prometheus 指标及 Alembic head。
+当前共 31 项后端自动化测试，覆盖认证、Refresh Token 轮换与撤销、RBAC、项目事务、项目成员权限、Issue 状态机与并发冲突、筛选分页、评论作者权限、Review 状态联动与并发幂等、通知归属、CORS、Prometheus 指标及 Alembic head。前端另使用 Vitest 做基础工具测试，并以 `vue-tsc` 和 Vite 生产构建作为类型与编译门禁。
 
 ## 可观测性与压测
 
@@ -294,7 +316,7 @@ backend/.venv/bin/python scripts/run_load_test.py \
 
 ## 当前版本边界
 
-已实现后端核心闭环、数据库通知、Redis/Celery 增强、会话撤销、并发控制、Prometheus 采集和容器化部署。未实现前端、真实 Git 仓库、附件、标签、WebSocket 网关、邮件/短信通知、CI/CD 或微服务。评论当前为平级讨论，正式数据库设计没有回复树所需的 `parent_id`。
+已实现 Vue 前端与后端核心闭环、数据库通知、Redis/Celery 增强、会话撤销、并发控制、Prometheus 采集和后端容器化部署。未实现真实 Git 仓库托管、附件、标签、WebSocket 网关、邮件/短信通知、前端容器镜像、CI/CD 或微服务。评论当前为平级讨论，正式数据库设计没有回复树所需的 `parent_id`。
 
 ## 后续方向
 
@@ -310,3 +332,5 @@ backend/.venv/bin/python scripts/run_load_test.py \
 - `docs/development/02-code-learning-guide.md`
 - `docs/development/03-api-debug-guide.md`
 - `docs/development/04-resume-interview-guide.md`
+- `docs/development/06-frontend-learning-guide.md`
+- `docs/development/07-frontend-api-mapping.md`
