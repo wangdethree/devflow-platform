@@ -1,11 +1,20 @@
 """ORM 模型聚合模块。
 
-Alembic 执行自动迁移时会加载本模块，
-确保所有业务模型已经注册到 Base.metadata。
+统一导入全部业务模型，确保 SQLAlchemy 和 Alembic
+能够从 Base.metadata 中发现完整的数据库表结构。
 """
 
-# 后续新增模型时，需要在这里统一导入。
-#
-# 示例：
-# from app.models.user import User
-# from app.models.role import Role
+from app.models.permission import Permission
+from app.models.role import Role
+from app.models.role_permission import RolePermission
+from app.models.user import User
+from app.models.user_role import UserRole
+
+
+__all__ = [
+    "User",
+    "Role",
+    "Permission",
+    "UserRole",
+    "RolePermission",
+]
