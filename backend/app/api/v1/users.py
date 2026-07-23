@@ -4,13 +4,13 @@ from fastapi import APIRouter
 
 from app.api.dependencies import CurrentUser
 from app.database.dependencies import DatabaseSession
-from app.repositories.rbac_repository import RBACRepository
 from app.schemas.user import (
     PermissionListResponse,
     UserResponse,
     UserUpdateRequest,
 )
 from app.services.user_service import UserService
+from app.services.rbac_service import RBACService
 
 
 router = APIRouter(prefix="/users", tags=["用户"])
@@ -43,7 +43,7 @@ async def get_my_permissions(
     current_user: CurrentUser,
     session: DatabaseSession,
 ) -> PermissionListResponse:
-    permissions = await RBACRepository(session).get_permission_codes(
+    permissions = await RBACService(session).get_permission_codes(
         current_user.id
     )
     return PermissionListResponse(permissions=sorted(permissions))

@@ -60,6 +60,13 @@ class InvalidStateTransitionError(BusinessError):
     code = "INVALID_STATE_TRANSITION"
 
 
+class RateLimitError(BusinessError):
+    """接口访问超过允许频率。"""
+
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "RATE_LIMITED"
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """注册业务异常、数据库异常和未预期异常处理器。"""
 

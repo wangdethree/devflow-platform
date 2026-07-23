@@ -12,6 +12,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, register_request_logging
+from app.core.cache import close_redis
 from app.database.session import engine
 
 
@@ -23,6 +24,7 @@ async def lifespan(_: FastAPI):
     """应用退出时主动释放数据库连接池。"""
 
     yield
+    await close_redis()
     await engine.dispose()
 
 

@@ -22,6 +22,7 @@ from app.repositories.review_repository import ReviewRepository
 from app.schemas.issue import IssueStatus
 from app.schemas.project import ProjectRoleName
 from app.schemas.review import ReviewDecisionRequest, ReviewStatus
+from app.tasks.notifications import enqueue_notification_delivery
 
 
 class ReviewService:
@@ -84,7 +85,7 @@ class ReviewService:
                 reviewer_id=reviewer_id,
             )
             issue.status = IssueStatus.REVIEW.value
-            await self.notifications.create(
+            notification = await self.notifications.create(
                 user_id=reviewer_id,
                 notification_type=REVIEW_REQUESTED,
                 target_type="review",
@@ -93,6 +94,7 @@ class ReviewService:
             )
             await self.session.commit()
             await self.session.refresh(review)
+            enqueue_notification_delivery(notification.id)
             return review
         except Exception:
             await self.session.rollback()
@@ -141,7 +143,7 @@ class ReviewService:
             else IssueStatus.IN_PROGRESS.value
         )
         try:
-            await self.notifications.create(
+            notification = await self.notifications.create(
                 user_id=review.requester_id,
                 notification_type=(
                     REVIEW_APPROVED
@@ -157,6 +159,7 @@ class ReviewService:
             )
             await self.session.commit()
             await self.session.refresh(review)
+            enqueue_notification_delivery(notification.id)
             return review
         except Exception:
             await self.session.rollback()

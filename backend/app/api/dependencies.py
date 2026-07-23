@@ -9,8 +9,8 @@ from app.core.exceptions import AuthenticationError, PermissionDeniedError
 from app.core.security import decode_access_token
 from app.database.dependencies import DatabaseSession
 from app.models.user import User
-from app.repositories.rbac_repository import RBACRepository
 from app.repositories.user_repository import UserRepository
+from app.services.rbac_service import RBACService
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -39,7 +39,7 @@ def require_permission(permission_code: str):
         session: DatabaseSession,
         current_user: CurrentUser,
     ) -> User:
-        permissions = await RBACRepository(session).get_permission_codes(
+        permissions = await RBACService(session).get_permission_codes(
             current_user.id
         )
         if permission_code not in permissions:

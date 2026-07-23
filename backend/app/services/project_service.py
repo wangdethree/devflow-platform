@@ -22,6 +22,7 @@ from app.schemas.project import (
     ProjectRoleName,
     ProjectUpdateRequest,
 )
+from app.tasks.notifications import enqueue_notification_delivery
 
 
 class ProjectService:
@@ -171,7 +172,7 @@ class ProjectService:
                 role_id=role.id,
             )
             # 成员关系与邀请通知共同提交，避免成员已加入但通知丢失。
-            await self.notifications.create(
+            notification = await self.notifications.create(
                 user_id=user.id,
                 notification_type=PROJECT_MEMBER_ADDED,
                 target_type="project",
@@ -180,6 +181,7 @@ class ProjectService:
             )
             await self.session.commit()
             await self.session.refresh(member)
+            enqueue_notification_delivery(notification.id)
         except Exception:
             await self.session.rollback()
             raise

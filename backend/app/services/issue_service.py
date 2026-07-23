@@ -19,6 +19,7 @@ from app.schemas.issue import (
     IssueUpdateRequest,
 )
 from app.schemas.project import ProjectRoleName
+from app.tasks.notifications import enqueue_notification_delivery
 
 
 ALLOWED_TRANSITIONS = {
@@ -92,6 +93,7 @@ class IssueService:
         await self._validate_assignee(project_id, payload.assignee_id)
 
         try:
+            notification = None
             issue = await self.issues.create(
                 project_id=project_id,
                 creator_id=creator.id,
@@ -102,7 +104,7 @@ class IssueService:
                 priority=payload.priority.value,
             )
             if issue.assignee_id is not None:
-                await self.notifications.create(
+                notification = await self.notifications.create(
                     user_id=issue.assignee_id,
                     notification_type=ISSUE_ASSIGNED,
                     target_type="issue",
@@ -111,6 +113,8 @@ class IssueService:
                 )
             await self.session.commit()
             await self.session.refresh(issue)
+            if notification is not None:
+                enqueue_notification_delivery(notification.id)
             return issue
         except Exception:
             await self.session.rollback()
@@ -147,12 +151,13 @@ class IssueService:
         for field, value in data.items():
             setattr(issue, field, value.value if hasattr(value, "value") else value)
         try:
+            notification = None
             if (
                 "assignee_id" in data
                 and issue.assignee_id is not None
                 and issue.assignee_id != old_assignee_id
             ):
-                await self.notifications.create(
+                notification = await self.notifications.create(
                     user_id=issue.assignee_id,
                     notification_type=ISSUE_ASSIGNED,
                     target_type="issue",
@@ -161,6 +166,8 @@ class IssueService:
                 )
             await self.session.commit()
             await self.session.refresh(issue)
+            if notification is not None:
+                enqueue_notification_delivery(notification.id)
             return issue
         except Exception:
             await self.session.rollback()
@@ -183,8 +190,9 @@ class IssueService:
             )
         issue.status = target_status.value
         try:
+            notification = None
             if issue.assignee_id is not None:
-                await self.notifications.create(
+                notification = await self.notifications.create(
                     user_id=issue.assignee_id,
                     notification_type=ISSUE_STATUS_CHANGED,
                     target_type="issue",
@@ -193,6 +201,8 @@ class IssueService:
                 )
             await self.session.commit()
             await self.session.refresh(issue)
+            if notification is not None:
+                enqueue_notification_delivery(notification.id)
             return issue
         except Exception:
             await self.session.rollback()
